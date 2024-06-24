@@ -7,7 +7,7 @@ final class ClientTest extends TestCase
 {
     private function client(): Client
     {
-        $connection_uri = 'nostr+walletconnect://<pubkey>?relay=wss://relay.getalby.com/v1&secret=<secret>';
+        $connection_uri = 'nostr+walletconnect://69effe7b49a6dd5cf525bd0905917a5005ffe480b58eeb8e861418cf3ae760d9?relay=wss://relay.getalby.com/v1&secret=01824b648f94760ab8b0b57b6f2b7b1a962969de612f4b986898c8d88eeddaf9&lud16=adithyavardhan@getalby.com';
         return new Client($connection_uri);
     }
     public function testCanBeInitialized(): void
