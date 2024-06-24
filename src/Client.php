@@ -21,8 +21,8 @@ class Client implements NWCClient
 
     public function __construct($connection_uri)
     {
-        $this->url = "https://api.getalby.com/nwc";
-        preg_match('/nostr\+walletconnect:\/\/([^?]+)\?relay=([^&]+)&secret=(.+)/', $connection_uri, $matches);
+        $this->url = "https://api.getalby.com/nwc/nip47";
+        preg_match('/nostr\+walletconnect:\/\/([^?]+)\?relay=([^&]+)&secret=([^&]+)/', $connection_uri, $matches);
         $this->walletPubkey = $matches[1];
         $this->relayUrl = $matches[2];
         $this->secret = $matches[3];
@@ -45,20 +45,21 @@ class Client implements NWCClient
     public function getInfo(): array
     {
         $jsonStr = '{"method": "get_info"}';
-        $data = $this->nip47Request($jsonStr);
-        return $data;
+        return $this->nip47Request($jsonStr);
     }
 
     public function getBalance(): array
     {
         $jsonStr = '{"method": "get_balance"}';
-        $data = $this->nip47Request($jsonStr);
-        return $data;
+        return $this->nip47Request($jsonStr);
     }
 
     public function addInvoice($invoice): array
     {
-        $params = [ "amount" => $invoice["value"] * 1000, "description" => $invoice["memo"] ];
+        $params = [
+          "amount" => $invoice["value"] * 1000,
+          "description" => $invoice["memo"]
+        ];
         if (array_key_exists("description_hash", $invoice) && !empty($invoice["description_hash"])) {
           $params['description_hash'] = $invoice['description_hash'];
         }
@@ -127,7 +128,7 @@ class Client implements NWCClient
         ];
 
         try {
-            $response = $this->client()->post('https://api.getalby.com/nwc/nip47', [
+            $response = $this->client()->post($this->url, [
               'json' => $body,
               'headers' => [
                   'Content-Type' => 'application/json',
@@ -163,8 +164,7 @@ class Client implements NWCClient
         if ($this->client) {
           return $this->client;
         }
-        $options = ["base_uri" => $this->url, 'timeout' => 10];
-        $this->client = new GuzzleHttp\Client($options);
+        $this->client = new GuzzleHttp\Client();
         return $this->client;
     }
 
