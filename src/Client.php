@@ -7,8 +7,7 @@ require_once "contracts/NWCClient.php";
 use Elliptic\EC;
 use \GuzzleHttp;
 use NWC\Contracts\NWCClient;
-use swentel\nostr\Event\Event;
-use swentel\nostr\Sign\Sign;
+use Mdanter\Ecc\Crypto\Signature\SchnorrSignature;
 
 class Client implements NWCClient
 {
@@ -110,21 +109,33 @@ class Client implements NWCClient
         // encrypt the request payload
         $content = $this->encrypt($payload, $this->sharedSecret);
 
-        // create the nostr event
-        $note = new Event();
-        $note->setKind(23194);
-        $note->addTag(['p', $this->walletPubkey]);
-        $note->setContent($content);
+        $ec = new EC('secp256k1');
+        $keyPair = $ec->keyFromPrivate($this->secret);
+        $publicKey = substr($keyPair->getPublic(true, 'hex'), 2);
 
-        // sign the nostr event
-        $signer = new Sign();
-        $signer->signEvent($note, $this->secret);
+        // create the nostr event
+        $event = [
+          'kind' => 23194,
+          'content' => $content,
+          'tags' => [['p', $this->walletPubkey]],
+          'pubkey' => $publicKey,
+          'created_at' => time(),
+        ];
+
+        // inspired by https://github.com/nostrver-se/nostr-php 
+        $serializedEvent = $this->serializeEvent($event);
+        $eventId = hash('sha256', $serializedEvent);
+        $event['id'] = $eventId;
+
+        $sign = new SchnorrSignature();
+        $signature = $sign->sign($this->secret, $eventId);
+        $event['sig'] = $signature['signature'];
 
         // create the body for http-nostr request
         $body = [
           'walletPubkey' => $this->walletPubkey,
           'relayUrl' => $this->relayUrl,
-          'event' => $note->toArray(),
+          'event' => $event,
         ];
 
         try {
@@ -204,5 +215,18 @@ class Client implements NWCClient
         );
 
         return $decrypted;
+    }
+
+    private function serializeEvent($event): string
+    {
+        $eventArray = [
+            0,
+            $event['pubkey'],
+            $event['created_at'],
+            $event['kind'],
+            $event['tags'],
+            $event['content'],
+        ];
+        return json_encode($eventArray, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }
