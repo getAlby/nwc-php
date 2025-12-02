@@ -21,10 +21,53 @@ class Client implements NWCClient
     public function __construct($connection_uri)
     {
         $this->url = "https://api.getalby.com/nwc/nip47";
-        preg_match('/nostr\+walletconnect:\/\/([^?]+)\?relay=([^&]+)&secret=([^&]+)/', $connection_uri, $matches);
-        $this->walletPubkey = $matches[1];
-        $this->relayUrl = $matches[2];
-        $this->secret = $matches[3];
+        
+        // Parse the nostr+walletconnect:// URI properly
+        if (strpos($connection_uri, 'nostr+walletconnect://') !== 0) {
+            throw new \InvalidArgumentException('Invalid NWC connection URI: must start with nostr+walletconnect://');
+        }
+        
+        // Remove the protocol prefix
+        $uri_without_protocol = substr($connection_uri, strlen('nostr+walletconnect://'));
+        
+        // Split into pubkey and query string
+        $parts = explode('?', $uri_without_protocol, 2);
+        if (count($parts) !== 2) {
+            throw new \InvalidArgumentException('Invalid NWC connection URI: missing query parameters');
+        }
+        
+        $this->walletPubkey = $parts[0];
+        
+        // Parse query string
+        parse_str($parts[1], $query_params);
+
+        // handle multiple relays by using PHP array syntax
+        $query_params = str_replace('relay=', 'relay[]=', $query_params);
+        
+        // Extract relay URL (use first relay if multiple are provided)
+        if (isset($query_params['relay'])) {
+            $this->relayUrl = is_array($query_params['relay'])
+                ? urldecode($query_params['relay'][0])
+                : urldecode($query_params['relay']);
+        } else {
+            throw new \InvalidArgumentException('Invalid NWC connection URI: missing relay parameter');
+        }
+        
+        // Extract secret
+        if (!isset($query_params['secret'])) {
+            throw new \InvalidArgumentException('Invalid NWC connection URI: missing secret parameter');
+        }
+        $this->secret = $query_params['secret'];
+
+        if (!preg_match('/^[a-f0-9]{64}$/', $this->walletPubkey)) {
+            throw new \InvalidArgumentException('Invalid pubkey');
+        }
+        if (!preg_match('/^[a-f0-9]{64}$/', $this->secret)) {
+            throw new \InvalidArgumentException('Invalid secret');
+        }
+        if (!filter_var($this->relayUrl, FILTER_VALIDATE_URL) || !in_array(parse_url($this->relayUrl, PHP_URL_SCHEME), ['ws', 'wss'])) {
+            throw new \InvalidArgumentException('Invalid relay URL');
+        }
 
         // Generate shared secret
         $this->sharedSecret = $this->computeSharedSecret($this->walletPubkey, $this->secret);
