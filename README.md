@@ -10,7 +10,7 @@ Add the following to your composer file:
   }
 ],
 "require": {
-  "getalby/nwc-php": "dev-main"
+  "getalby/nwc-php": "v1.0.1"
 }
 ```
 
